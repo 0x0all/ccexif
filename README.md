@@ -3,7 +3,7 @@ ccexif
 
 Header only simple EXIF reader in C++
 
-Based on https://code.google.com/p/easyexif/source/browse/trunk/exif.{h,cpp}
+Based on https://code.google.com/p/easyexif/source/browse/trunk/
 
 Sample
 ===
