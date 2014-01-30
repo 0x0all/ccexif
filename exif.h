@@ -164,17 +164,9 @@ namespace exif
       }
       offset += 6;
 
-// Now parsing the TIFF header. The first two bytes are either "II" or
-// "MM" for Intel or Motorola byte alignment. Sanity check by parsing
-// the unsigned short that follows, making sure it equals 0x2a. The
-// last 4 bytes are an offset into the first IFD, which are added to 
-// the global offset counter. For this block, we expect the following
-// minimum size:
 //  2 bytes: 'II' or 'MM'
 //  2 bytes: 0x002a
 //  4 bytes: offset to first IDF
-// -----------------------------
-//  8 bytes
       Endian endian = INTEL;
       if (buf[offset] == 'I' && buf[offset+1] == 'I') {
         endian = INTEL;
@@ -194,12 +186,7 @@ namespace exif
       uint32_t ifd_offset = to_uint32(buf+offset + 2 + 2, endian);
       offset += ifd_offset; 
 
-// Now parsing the first Image File Directory (IFD0, for the main image).
-// An IFD consists of a variable number of 12-byte directory entries. The
-// first two bytes of the IFD section contain the number of directory
-// entries in the section. The last 4 bytes of the IFD contain an offset
-// to the next IFD, which means this IFD must contain exactly 6 + 12 * num
-// bytes of data.
+      //IFD0
       if (length < offset + 2) {
         return false;
       }
@@ -239,12 +226,9 @@ namespace exif
 
         default: break;
         }
-      }
+      } // IFD0
 
-// Jump to the EXIF SubIFD if it exists and parse all the information
-// there. Note that it's possible that the EXIF SubIFD doesn't exist.
-// The EXIF SubIFD contains most of the interesting information that a
-// typical user might want.
+      // EXIF
       if (exif_offset + 4 <= length) {
         offset = exif_offset;
         n_entries = to_uint16(buf + offset, endian);
@@ -291,8 +275,7 @@ namespace exif
         }
       } // EXIF
 
-// Jump to the GPS SubIFD if it exists and parse all the information
-// there. Note that it's possible that the GPS SubIFD doesn't exist.
+      // GPS
       if (gps_offset + 4 <= length) {
         offset = gps_offset;
         n_entries = to_uint16(buf + offset, endian);
@@ -339,7 +322,7 @@ namespace exif
         if ('S' == GeoLocation.LatComponents.direction) GeoLocation.Latitude = -GeoLocation.Latitude;
         if ('W' == GeoLocation.LonComponents.direction) GeoLocation.Longitude = -GeoLocation.Longitude;
         if (1 == GeoLocation.AltitudeRef) GeoLocation.Altitude = -GeoLocation.Altitude;
-      }
+      } // GPS
 
       return true;
     } // parse()
