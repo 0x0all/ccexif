@@ -42,6 +42,7 @@ namespace exif
     return (denominator > 1e-20? numerator / denominator : 0.);
   }
 
+  //NOTE: JPEG only
   inline std::string extract_exif(std::istream& is) {
     //SOI
     std::string nil;
@@ -159,11 +160,13 @@ namespace exif
         return false;
       }
 
+//  6 bytes
       if (! std::equal(buf, buf + 6, "Exif\0\0")) {
         return false;
       }
       offset += 6;
 
+//  8 bytes
 //  2 bytes: 'II' or 'MM'
 //  2 bytes: 0x002a
 //  4 bytes: offset to first IDF
