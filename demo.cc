@@ -3,8 +3,7 @@
 
 int main(int, const char *argv[])
 {
-  std::ifstream is(argv[1]);
-  std::string s = exif::extract_exif(is);
+  std::string s = exif::extract_exif(argv[1]);
   if (s.empty())  return 0;
 
   exif::Info info; 
