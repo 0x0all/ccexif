@@ -83,6 +83,7 @@ namespace exif
     return extract_exif(ifs);
   }
 
+  template <typename T> struct EntryParser;
   struct Entry
   {
     uint16_t tag_;
@@ -121,6 +122,30 @@ namespace exif
       if (base + offset + 8 <= end) return exif::to_rational(base + offset, endian_);
       return 0; 
     }
+
+    template <typename T> void parse_to(T& val, const unsigned char* base, const unsigned char *end) const {
+      EntryParser<T>::parse_to(*this, val, base, end);
+    };
+  };
+
+  template <> struct EntryParser<std::string> {
+    static void parse_to(const Entry &entry, std::string& val, const unsigned char* base, const unsigned char *end) { val = entry.to_string(base, end); }
+  };
+
+  template <> struct EntryParser<double> {
+    static void parse_to(const Entry &entry, double& val, const unsigned char* base, const unsigned char *end) { val = entry.to_rational(base, end); }
+  };
+
+  template <> struct EntryParser<unsigned int> {
+    static void parse_to(const Entry &entry, unsigned int& val, const unsigned char*, const unsigned char *) { val = entry.to_uint32(); }
+  };
+
+  template <> struct EntryParser<unsigned short> {
+    static void parse_to(const Entry &entry, unsigned short& val, const unsigned char*, const unsigned char *) { val = entry.to_uint16(); }
+  };
+
+  template <> struct EntryParser<char> {
+    static void parse_to(const Entry &entry, char& val, const unsigned char*, const unsigned char *) { val = (char)entry.to_uint8(); }
   };
 
   struct Info
@@ -188,43 +213,22 @@ namespace exif
       const unsigned char *base = buf + 6, *end = buf + length;
       uint32_t gps_offset = length, exif_offset = length;
 
+#define PARSE_ENTRY(tag, val) case tag: entry.parse_to(val, base, end); break;
+
       while (--n_entries >= 0) {
         Entry entry(buf + offset, endian);
         offset += 12;
 
         switch(entry.tag_) {
-        case 0x102: 
-          // Bits per sample
-          if (entry.format_ == FORMAT_SHORT) BitsPerSample = entry.to_uint16(); break;
+        PARSE_ENTRY(0x102, BitsPerSample)
+        PARSE_ENTRY(0x10E, ImageDescription)
+        PARSE_ENTRY(0x10F, Make)
+        PARSE_ENTRY(0x110, Model)
+        PARSE_ENTRY(0x112, Orientation)
+        PARSE_ENTRY(0x131, Software)
+        PARSE_ENTRY(0x132, DateTime)
+        PARSE_ENTRY(0x8298, Copyright)
 
-        case 0x10E:
-          // Image description
-          if (entry.format_ == FORMAT_ASCII) ImageDescription = entry.to_string(base, end); break;
-
-        case 0x10F:
-          // Digicam make
-          if (entry.format_ == FORMAT_ASCII) Make = entry.to_string(base, end); break;
-
-        case 0x110:
-          // Digicam model
-          if (entry.format_ == FORMAT_ASCII) Model = entry.to_string(base, end); break;
-  
-        case 0x112:
-          // Orientation of image
-          if (entry.format_ == FORMAT_SHORT) Orientation = entry.to_uint16(); break;
-  
-        case 0x131:
-          // Software used for image
-          if (entry.format_ == FORMAT_ASCII) Software = entry.to_string(base, end); break;
-  
-        case 0x132:
-          // EXIF/TIFF date/time of image modification
-          if (entry.format_ == FORMAT_ASCII) DateTime = entry.to_string(base, end); break;
-  
-        case 0x8298:
-          // Copyright information
-          if (entry.format_ == FORMAT_ASCII) Copyright = entry.to_string(base, end); break;
-  
         case 0x8825:
           // GPS IFD offset
           gps_offset = 6 + entry.to_uint32(); break;
@@ -254,58 +258,21 @@ namespace exif
           offset += 12;
 
           switch(entry.tag_) {
-          case 0x829a:
-            // Exposure time in seconds
-            if (entry.format_ == FORMAT_RATIONAL) ExposureTime = entry.to_rational(base, end); break;
-  
-          case 0x829d:
-            // FNumber
-            if (entry.format_ == FORMAT_RATIONAL) FNumber = entry.to_rational(base, end); break;
-  
-          case 0x8827:
-            // ISO Speed Rating
-            if (entry.format_ == FORMAT_SHORT) ISOSpeedRatings = entry.to_uint16(); break;
-  
-          case 0x9003:
-            // Original date and time
-            if (entry.format_ == FORMAT_ASCII) DateTimeOriginal = entry.to_string(base, end); break;
-  
-          case 0x9004:
-            // Digitization date and time
-            if (entry.format_ == FORMAT_ASCII) DateTimeDigitized = entry.to_string(base, end); break;
-  
-          case 0x9201:
-            // Shutter speed value
-            if (entry.format_ == FORMAT_RATIONAL) ShutterSpeedValue = entry.to_rational(base, end); break;
+          PARSE_ENTRY(0x829a, ExposureTime)
+          PARSE_ENTRY(0x829d, FNumber)
+          PARSE_ENTRY(0x8827, ISOSpeedRatings)
+          PARSE_ENTRY(0x9003, DateTimeOriginal)
+          PARSE_ENTRY(0x9004, DateTimeDigitized)
+          PARSE_ENTRY(0x9201, ShutterSpeedValue)
+          PARSE_ENTRY(0x9202, ApertureValue)
+          PARSE_ENTRY(0x9204, ExposureBiasValue)
+          PARSE_ENTRY(0x9206, SubjectDistance)
+          PARSE_ENTRY(0x9209, Flash)
+          PARSE_ENTRY(0x920a, FocalLength)
+          PARSE_ENTRY(0x9207, MeteringMode)
+          PARSE_ENTRY(0x9291, SubSecTimeOriginal)
+          PARSE_ENTRY(0xa405, FocalLengthIn35mm)
 
-          case 0x9202:
-            // Shutter speed value
-            if (entry.format_ == FORMAT_RATIONAL) ApertureValue = entry.to_rational(base, end); break;
-  
-          case 0x9204:
-            // Exposure bias value 
-            if (entry.format_ == FORMAT_RATIONAL) ExposureBiasValue = entry.to_rational(base, end); break;
-  
-          case 0x9206:
-            // Subject distance
-            if (entry.format_ == FORMAT_RATIONAL) SubjectDistance = entry.to_rational(base, end); break;
-  
-          case 0x9209:
-            // Flash used
-            if (entry.format_ == FORMAT_SHORT) Flash = entry.to_uint16()? 1 : 0; break;
-  
-          case 0x920a:
-            // Focal length
-            if (entry.format_ == FORMAT_RATIONAL) FocalLength = entry.to_rational(base, end); break;
-  
-          case 0x9207:
-            // Metering mode
-            if (entry.format_ == FORMAT_SHORT) MeteringMode = entry.to_uint16(); break;
-  
-          case 0x9291:
-            // Subsecond original time
-            if (entry.format_ == FORMAT_ASCII) SubSecTimeOriginal = entry.to_string(base, end); break;
-  
           case 0xa002:
             // EXIF Image width
             if (entry.format_ == FORMAT_LONG) ImageWidth = entry.to_uint32();
@@ -318,10 +285,6 @@ namespace exif
             else if (entry.format_ == FORMAT_SHORT) ImageHeight = entry.to_uint16();
             break;
   
-          case 0xa405:
-            // Focal length in 35mm film
-            if (entry.format_ == FORMAT_SHORT) FocalLengthIn35mm = entry.to_uint16(); break;
-
           default:
             break;
           }
@@ -343,10 +306,11 @@ namespace exif
           offset += 12;
 
           switch(entry.tag_) {
-            case 1:
-              // GPS north or south
-              GeoLocation.LatComponents.direction = entry.to_uint8(); break;
-    
+            PARSE_ENTRY(1, GeoLocation.LatComponents.direction)
+            PARSE_ENTRY(3, GeoLocation.LonComponents.direction)
+            PARSE_ENTRY(5, GeoLocation.AltitudeRef)
+            PARSE_ENTRY(6, GeoLocation.Altitude)
+   
             case 2:
               // GPS latitude
               if (entry.format_ == FORMAT_RATIONAL && entry.length_ == 3) {
@@ -356,11 +320,7 @@ namespace exif
                 GeoLocation.Latitude = GeoLocation.LatComponents.to_rational();
               }
               break;
-    
-            case 3:
-              // GPS east or west
-              GeoLocation.LonComponents.direction = entry.to_uint8(); break;
-    
+   
             case 4:
               // GPS longitude
               if (entry.format_ == FORMAT_RATIONAL && entry.length_ == 3) {
@@ -370,17 +330,9 @@ namespace exif
                 GeoLocation.Longitude = GeoLocation.LonComponents.to_rational();
               }
               break;
-    
-            case 5:
-              // GPS altitude reference (below or above sea level)
-              GeoLocation.AltitudeRef = entry.to_uint8(); break; break;
-    
-            case 6:
-              // GPS altitude reference
-              if (entry.format_ == FORMAT_RATIONAL) GeoLocation.Altitude = entry.to_rational(base, end); break;          
-          
-          default:
-            break;
+
+            default:
+              break;
           }
         }
 
@@ -439,7 +391,7 @@ namespace exif
                                       // 3: spot
                                       // 4: multi-spot
                                       // 5: multi-segment
-    char Flash;                       // 0 = no flash, 1 = flash used
+    unsigned short Flash;             // 0 = no flash, 1 = flash used
     double FocalLength;               // Focal length of lens in millimeters
     unsigned short FocalLengthIn35mm; // Focal length in 35mm film
     unsigned int ImageWidth;              // Image width reported in EXIF data

@@ -8,7 +8,7 @@ int main(int, const char *argv[])
 
   exif::Info info; 
   if (info.parse(s)) {
-      std::cout << info.Make << "," << info.Model << "," << info.Software << ", " << info.DateTimeOriginal << std::endl;
+      std::cout << info.Make << "," << info.Model << "," << info.Software << ", " << info.DateTimeOriginal << ", " << info.FNumber << std::endl;
   }
 
   return 0;
